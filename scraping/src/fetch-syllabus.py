@@ -13,7 +13,6 @@ from curses import keyname
 from lib2to3.pgen2 import driver
 import os
 import csv
-import pandas as pd
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.support.select import Select
@@ -29,20 +28,25 @@ driver = webdriver.Remote(
 
 # リンク一覧の取得に関する関数 -------------------------------
 # aタグから詳細ページへのリンクkeyを取得
-def extract_key_to_link(a_tag: set):
+def extract_key_to_link(a_tag):
 
     # ex of a tag
     # <a href="#" onclick="post_submit('JAA104DtlSubCon', '1200000110182022120000011012')">導入演習（選択）　１８</a>
     # if a tag were the one above, the key is 1200000110182022120000011012
     split_str = '<a href="#" onclick="post_submit(' + "'JAA104DtlSubCon', '"
-    key = str(a_tag).split(split_str)[0].split("')" + '">')[0]
+    key = ''
+
+    print('key: ', key)
 
     return key
 
 # keyとmergeして詳細ページへのリンクを作成
 def join_key_with_baselink(key: str):
-    base_link = 'https://www.wsl.waseda.jp/syllabus/JAA104.php?pLng=jp&'
-    link = base_link + key
+    base_link = 'https://www.wsl.waseda.jp/syllabus/JAA104.php?pKey='
+    link = base_link + key + '&pLng=jp'
+
+    print('link: ', link)
+    print('\n')
 
     return link
 
@@ -62,6 +66,8 @@ def fetch_a_tags():
         a = elem.find('a')
         a_tag_set.add(a)
 
+    print('a_tag_set:\n', a_tag_set)
+
     return a_tag_set
 
 # 表示されているページにおける詳細ページへのリンクを一覧に追加
@@ -72,6 +78,8 @@ def add_to_link_set(link_set: set):
         key: str = extract_key_to_link(a_tag)
         link: str = join_key_with_baselink(key)
         link_set.add(link)
+
+    print('link_set:\n', link_set)
 
     return link_set
 # --------------------------------------------------------
@@ -111,8 +119,13 @@ def fetch_class_info(link_set: set):
                 # 分岐する必要あると思う
                 vals = [td.get_text() for td in tr.find_all('td').get_text()]
 
+                print(keys)
+                print(vals)
+
                 key_list += keys
                 val_list += vals
+
+        print(val_list)
 
         all_class_info_key.append(key_list)
         all_class_info_val.append(val_list)
@@ -123,7 +136,13 @@ def class_info_to_csv(class_info: list):
     with open('data/class.csv', 'w') as f:
         writer = csv.writer()
         writer.writerows(class_info)
-    return
+
+def class_link_to_csv(link_set: set):
+    link_list = list(link_set)
+
+    with open('data/link.csv', 'w') as f:
+        writer = csv.writer()
+        writer.writerows(link_list)
 
 def main():
     # 全授業の詳細ページへのリンクを取得 ---------------------------
@@ -144,9 +163,14 @@ def main():
         driver.find_element_by_xpath("//input[@value=' 検  索 ']").click()
 
         print('week:' + week + ' now fetching...')
+        pagecount = 0
 
         # ページに表示されている10件のリンクを追加
         while True: 
+            pagecount += 1
+            print('現在のページ数: ', pagecount)
+            print('\n')
+
             link_set = add_to_link_set(link_set)
 
             # 表示されているページの詳細リンクを作成したらページ遷移
@@ -154,7 +178,7 @@ def main():
             # continueして次の曜日へ
             try: 
                 driver.find_element_by_xpath("//table[@class='t-btn']").find_element_by_xpath("//*[text()=\"次へ>\"]").click()
-                print('Successfully gone to next page...')
+                print('Successfully went to next page...')
             except Exception as e:
                 print(e)
                 print('Finish fetching class info of week: ' + week)
@@ -162,7 +186,8 @@ def main():
 
     # --------------------------------------------------------
     # リンク一覧に飛んで詳細情報を取得 ----------------------------
-    print('Finish fetching all class info and start fetching details...')
+    print('Finish fetching all links and start fetching details...')
+    class_link_to_csv(link_set)
 
     class_info = fetch_class_info(link_set)
     class_info_to_csv(class_info)

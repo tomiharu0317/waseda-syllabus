@@ -29,9 +29,15 @@ driver = webdriver.Remote(
 
 # リンク一覧の取得に関する関数 -------------------------------
 # aタグから詳細ページへのリンクkeyを取得
-# FIXME
-def extract_key_to_link(a_tag_set: set):
-    return "key"
+def extract_key_to_link(a_tag: set):
+
+    # ex of a tag
+    # <a href="#" onclick="post_submit('JAA104DtlSubCon', '1200000110182022120000011012')">導入演習（選択）　１８</a>
+    # if a tag were the one above, the key is 1200000110182022120000011012
+    split_str = '<a href="#" onclick="post_submit(' + "'JAA104DtlSubCon', '"
+    key = str(a_tag).split(split_str)[0].split("')" + '">')[0]
+
+    return key
 
 # keyとmergeして詳細ページへのリンクを作成
 def join_key_with_baselink(key: str):

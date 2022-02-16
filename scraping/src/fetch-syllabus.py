@@ -9,10 +9,15 @@
 # 詳細ページの内容取得
 # ----------------------------------------
 
+from curses import keyname
+from lib2to3.pgen2 import driver
 import os
+import csv
+import pandas as pd
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.support.select import Select
+
 
 # リンク一覧の取得に関する関数 -------------------------------
 
@@ -55,10 +60,56 @@ def add_to_link_set(link_set: set):
         link_set.add(link)
 
     return link_set
-
 # --------------------------------------------------------
 # リンクに飛んで詳細ページの情報を取得する関数 ------------------
+def fetch_pagesource(link: str):
 
+    driver.get(link)
+    driver.implicitly_wait(1)
+    html = driver.page_source.encode('utf-8')
+
+    return html
+
+def fetch_class_info(link_set: set):
+
+    all_class_info_key: list = []
+    all_class_info_val: list = []
+
+    for link in link_set:
+
+        html = fetch_pagesource(link)
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # pandasで以下のtidyな形で取得
+        # key, key, key
+        # value, value, value
+        key_list: list = []
+        val_list: list = []
+        tables = soup.find_all('table', class_= 'ct-common ct-sirabasu')
+
+        for table in tables:
+            tr_list: list = table.find_all('tr')
+            for tr in tr_list:
+                # keyはcol_nameにする以外いらないかも
+                keys = [th.get_text() for th in tr.find_all('th')]
+
+                # 成績評価のところだけ違うのでそこで詰まるかも
+                # 分岐する必要あると思う
+                vals = [td.get_text() for td in tr.find_all('td').get_text()]
+
+                key_list += keys
+                val_list += vals
+
+        all_class_info_key.append(key_list)
+        all_class_info_val.append(val_list)
+
+    return all_class_info_val
+
+def class_info_to_csv(class_info: list):
+    with open('data/class.csv', 'w') as f:
+        writer = csv.writer()
+        writer.writerows(class_info)
+    return
 
 def main():
     options = webdriver.FirefoxOptions()
@@ -71,6 +122,8 @@ def main():
 
     # 全授業の詳細ページへのリンクを取得 ---------------------------
     # --------------------------------------------------------
+    print('Start fetching...')
+
     link_set: set = set()
     week_list: list = ['月', '火', '水', '木', '金', '土', '日', '無']
     TOP_URL: str = 'https://www.wsl.waseda.jp/syllabus/JAA101.php?pLng=jp'
@@ -84,6 +137,8 @@ def main():
         select_youbi.select_by_visible_text(week)
         driver.find_element_by_xpath("//input[@value=' 検  索 ']").click()
 
+        print('week:' + week + ' now fetching...')
+
         link_set = add_to_link_set()
 
         # 表示されているページの詳細リンクを作成したらページ遷移
@@ -91,16 +146,20 @@ def main():
         # continueして次の曜日へ
         try: 
             driver.find_element_by_xpath("//table[@class='t-btn']").find_element_by_xpath("//*[text()=\"次へ>\"]").click()
+            print('Successfully gone to next page...')
         except Exception as e:
             print(e)
+            print('Finish fetching class info of week: ' + week)
             continue
 
     # --------------------------------------------------------
     # リンク一覧に飛んで詳細情報を取得 ----------------------------
-    # TODO: どのような形で詳細情報を受け取るか
-    # 後で整形しやすい形で（できればtidyに）
-    for link in link_set:
-        return
+    print('Finish fetching all class info and start fetching details...')
+
+    class_info = fetch_class_info(link_set)
+    class_info_to_csv(class_info)
+
+    print('Successfully fetched class info and save to csv!')
 
     driver.quit()
 

@@ -19,9 +19,17 @@ from selenium import webdriver
 from selenium.webdriver.support.select import Select
 
 
-# リンク一覧の取得に関する関数 -------------------------------
+options = webdriver.FirefoxOptions()
+options.add_argument('--headless')
 
+driver = webdriver.Remote(
+    command_executor=os.environ["SELENIUM_URL"],
+    options=options
+)
+
+# リンク一覧の取得に関する関数 -------------------------------
 # aタグから詳細ページへのリンクkeyを取得
+# FIXME
 def extract_key_to_link(a_tag_set: set):
     return "key"
 
@@ -112,14 +120,6 @@ def class_info_to_csv(class_info: list):
     return
 
 def main():
-    options = webdriver.FirefoxOptions()
-    options.add_argument('--headless')
-
-    driver = webdriver.Remote(
-        command_executor=os.environ["SELENIUM_URL"],
-        options=options
-    )
-
     # 全授業の詳細ページへのリンクを取得 ---------------------------
     # --------------------------------------------------------
     print('Start fetching...')
@@ -139,18 +139,20 @@ def main():
 
         print('week:' + week + ' now fetching...')
 
-        link_set = add_to_link_set()
+        # ページに表示されている10件のリンクを追加
+        while True: 
+            link_set = add_to_link_set(link_set)
 
-        # 表示されているページの詳細リンクを作成したらページ遷移
-        # 次へがなかったら最後のページまで行っているので、
-        # continueして次の曜日へ
-        try: 
-            driver.find_element_by_xpath("//table[@class='t-btn']").find_element_by_xpath("//*[text()=\"次へ>\"]").click()
-            print('Successfully gone to next page...')
-        except Exception as e:
-            print(e)
-            print('Finish fetching class info of week: ' + week)
-            continue
+            # 表示されているページの詳細リンクを作成したらページ遷移
+            # 次へがなかったら最後のページまで行っているので、
+            # continueして次の曜日へ
+            try: 
+                driver.find_element_by_xpath("//table[@class='t-btn']").find_element_by_xpath("//*[text()=\"次へ>\"]").click()
+                print('Successfully gone to next page...')
+            except Exception as e:
+                print(e)
+                print('Finish fetching class info of week: ' + week)
+                break
 
     # --------------------------------------------------------
     # リンク一覧に飛んで詳細情報を取得 ----------------------------

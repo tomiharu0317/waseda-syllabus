@@ -34,10 +34,9 @@ def extract_key_to_link(a_tag):
     # <a href="#" onclick="post_submit('JAA104DtlSubCon', '1200000110182022120000011012')">導入演習（選択）　１８</a>
     # if a tag were the one above, the key is 1200000110182022120000011012
     split_str = '<a href="#" onclick="post_submit(' + "'JAA104DtlSubCon', '"
-    key = ''
+    key = str(a_tag).split(split_str)[1].split("')" + '">')[0]
 
     print('key: ', key)
-
     return key
 
 # keyとmergeして詳細ページへのリンクを作成
@@ -59,7 +58,8 @@ def fetch_a_tags():
     soup = BeautifulSoup(html, 'html.parser')
 
     table = soup.find('table', class_ = 'ct-vh')
-    tr = table.find_all('tr')
+    # index0にaタグを含まない列名のtrが含まれるので取り除く
+    tr = table.find_all('tr')[1:]
 
     # aタグからkeyを取得
     for elem in tr:

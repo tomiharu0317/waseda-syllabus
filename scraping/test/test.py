@@ -1,6 +1,7 @@
 from cgi import test
 import os
 import csv
+import pytest
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.support.select import Select
@@ -36,7 +37,6 @@ def fetch_a_tags():
 
     table = soup.find('table', class_ = 'ct-vh')
 
-    # FIXME
     # aタグを含まないタイトルtrを含み、len = 11となる
     # そのため最初の要素を消してからやる
     tr = table.find_all('tr')[1:]
@@ -86,8 +86,69 @@ def test_extract_key_to_link():
 
     driver.quit()
 
+def fetch_pagesource(link: str):
+
+    driver.get(link)
+    driver.implicitly_wait(1)
+    html = driver.page_source.encode('utf-8')
+
+    return html
+
+def fetch_class_info(link_set: set):
+
+    all_class_info_key: list = []
+    all_class_info_val: list = []
+
+    for link in link_set:
+
+        html = fetch_pagesource(link)
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # pandasで以下のtidyな形で取得
+        # key, key, key
+        # value, value, value
+        key_list: list = []
+        val_list: list = []
+        tables = soup.find_all('table', class_= 'ct-common ct-sirabasu')
+
+        for table in tables:
+            tr_list: list = table.find_all('tr')
+            # print(tr_list)
+            for tr in tr_list:
+                # keyはcol_nameにする以外いらないかも
+                keys = [th.get_text() for th in tr.find_all('th')]
+
+                # print(keys)
+
+                # 成績評価のところだけ違うのでそこで詰まるかも
+                # 分岐する必要あると思う
+                vals = [td.get_text() for td in tr.find_all('td')]
+
+                # print(vals)
+
+                key_list += keys
+                val_list += vals
+
+        print(val_list)
+
+        all_class_info_key.append(key_list)
+        all_class_info_val.append(val_list)
+
+    return all_class_info_val
+
+# FIXME: add some links
+def test_fetch_class_info():
+    link_set: set = set()
+    link_set.add('https://www.wsl.waseda.jp/syllabus/JAA104.php?pKey=3332000502012022333200050233&pLng=jp')
+    # link_set.add()
+    
+    all_class_info = fetch_class_info(link_set)
+
+    return
+
 def test():
-    test_extract_key_to_link()
+    # test_extract_key_to_link()
+    test_fetch_class_info()
 
 if __name__ == '__main__':
     test()

@@ -13,6 +13,8 @@ from curses import keyname
 from lib2to3.pgen2 import driver
 import os
 import csv
+import time
+from pickle import FALSE, TRUE
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.support.select import Select
@@ -36,7 +38,7 @@ def extract_key_to_link(a_tag):
     split_str = '<a href="#" onclick="post_submit(' + "'JAA104DtlSubCon', '"
     key = str(a_tag).split(split_str)[1].split("')" + '">')[0]
 
-    print('key: ', key)
+    # print('key: ', key)
     return key
 
 # keyとmergeして詳細ページへのリンクを作成
@@ -44,15 +46,15 @@ def join_key_with_baselink(key: str):
     base_link = 'https://www.wsl.waseda.jp/syllabus/JAA104.php?pKey='
     link = base_link + key + '&pLng=jp'
 
-    print('link: ', link)
-    print('\n')
+    # print('link: ', link)
+    # print('\n')
 
     return link
 
 # 10件の一覧ページからリンクを取得
 def fetch_a_tags():
     a_tag_set: set = set()
-    driver.implicitly_wait(1)
+    driver.implicitly_wait(3)
 
     html = driver.page_source.encode('utf-8')
     soup = BeautifulSoup(html, 'html.parser')
@@ -70,7 +72,7 @@ def fetch_a_tags():
 
     return a_tag_set
 
-# 表示されているページにおける詳細ページへのリンクを一覧に追加
+# 表示されているページにおける詳細ページへのリンク10件を一覧に追加
 def add_to_link_set(link_set: set):
     a_tag_set: set = fetch_a_tags()
 
@@ -79,7 +81,7 @@ def add_to_link_set(link_set: set):
         link: str = join_key_with_baselink(key)
         link_set.add(link)
 
-    print('link_set:\n', link_set)
+    # print('link_set:\n', link_set)
 
     return link_set
 # --------------------------------------------------------
@@ -92,45 +94,57 @@ def fetch_pagesource(link: str):
 
     return html
 
+def extract_key_from_table(tr_list: list):
+    class_info_key: list = []
+    
+    for tr in tr_list:
+        keys = [th.get_text() for th in tr.find_all('th')]
+        class_info_key += keys
+        
+    # 授業方法区分 と コースコードの間に 空白の要素があるので取り除く
+    class_info_key.pop(14)
+
+    return class_info_key
+
+def extract_val_from_table(tr_list: list):
+    val_list: list = []
+
+    for tr in tr_list:
+        vals = [td.get_text() for td in tr.find_all('td')]
+        val_list += vals
+
+    return val_list
+
 def fetch_class_info(link_set: set):
 
-    all_class_info_key: list = []
+    class_info_key: list = []
     all_class_info_val: list = []
+    first_time: bool = False
 
     for link in link_set:
 
         html = fetch_pagesource(link)
         soup = BeautifulSoup(html, 'html.parser')
+        # シラバス情報の取得は断念
+        table = soup.find('table', class_= 'ct-common ct-sirabasu')
+        tr_list: list = table.find_all('tr')
+
+        # 初回のみkeyを取得
+        if first_time == False: 
+            first_time = True
+            class_info_key = extract_key_from_table(tr_list)
+            class_info_key.append('元シラバスリンク')
+            print('class_info_key:\n', class_info_key)
+            print('len(class_info_key):', len(class_info_key))
         
-        # pandasで以下のtidyな形で取得
-        # key, key, key
-        # value, value, value
-        key_list: list = []
-        val_list: list = []
-        tables = soup.find_all('table', class_= 'ct-common ct-sirabasu')
-
-        for table in tables:
-            tr_list: list = table.find_all('tr')
-            for tr in tr_list:
-                # keyはcol_nameにする以外いらないかも
-                keys = [th.get_text() for th in tr.find_all('th')]
-
-                # 成績評価のところだけ違うのでそこで詰まるかも
-                # 分岐する必要あると思う
-                vals = [td.get_text() for td in tr.find_all('td').get_text()]
-
-                print(keys)
-                print(vals)
-
-                key_list += keys
-                val_list += vals
-
-        print(val_list)
-
-        all_class_info_key.append(key_list)
+        val_list = extract_val_from_table(tr_list)
+        val_list.append(link)
+        print('val_list:\n', val_list)
+        print('len(val_list):', len(val_list))
+    
         all_class_info_val.append(val_list)
 
-    return all_class_info_val
+    return class_info_key, all_class_info_val
 
 def class_info_to_csv(class_info: list):
     with open('data/class.csv', 'w') as f:
@@ -168,8 +182,8 @@ def main():
         # ページに表示されている10件のリンクを追加
         while True: 
             pagecount += 1
-            print('現在のページ数: ', pagecount)
             print('\n')
+            print('現在のページ数: ', pagecount)
 
             link_set = add_to_link_set(link_set)
 
@@ -178,6 +192,7 @@ def main():
             # continueして次の曜日へ
             try: 
                 driver.find_element_by_xpath("//table[@class='t-btn']").find_element_by_xpath("//*[text()=\"次へ>\"]").click()
+                time.sleep(1)
                 print('Successfully went to next page...')
             except Exception as e:
                 print(e)
@@ -189,8 +204,10 @@ def main():
     print('Finish fetching all links and start fetching details...')
     class_link_to_csv(link_set)
 
-    class_info = fetch_class_info(link_set)
-    class_info_to_csv(class_info)
+    class_info_key, all_class_info_val = fetch_class_info(link_set)
+    
+    # FIXME: csvへの保存の仕方
+    # class_info_to_csv(class_info)
 
     print('Successfully fetched class info and save to csv!')
 

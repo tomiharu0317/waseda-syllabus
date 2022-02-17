@@ -124,7 +124,7 @@ def fetch_class_info(link_set: set):
 
     class_info_key: list = []
     all_class_info_val: list = []
-    first_time: bool = FALSE
+    first_time: bool = False
 
     for link in link_set:
 
@@ -133,13 +133,15 @@ def fetch_class_info(link_set: set):
         table = soup.find('table', class_= 'ct-common ct-sirabasu')
         tr_list: list = table.find_all('tr')
 
-        if first_time == FALSE: 
-            first_time = TRUE
+        if first_time == False: 
+            first_time = True
             class_info_key = extract_key_from_table(tr_list)
+            class_info_key.append('元シラバスリンク')
             print('class_info_key:\n', class_info_key)
             print('len(class_info_key):', len(class_info_key))
         
         val_list = extract_val_from_table(tr_list)
+        val_list.append(link)
         print('val_list:\n', val_list)
         print('len(val_list):', len(val_list))
     
@@ -147,18 +149,51 @@ def fetch_class_info(link_set: set):
 
     return class_info_key, all_class_info_val
 
-def test_fetch_class_info():
+def make_link_set():
     link_set: set = set()
     link_set.add('https://www.wsl.waseda.jp/syllabus/JAA104.php?pKey=3332000502012022333200050233&pLng=jp')
     link_set.add('https://www.wsl.waseda.jp/syllabus/JAA104.php?pKey=1200007D810120221200007D8112&pLng=jp')
     
+    return link_set
+
+def test_fetch_class_info():
+    link_set = make_link_set()
+    
     class_info_key, all_class_info_val = fetch_class_info(link_set)
+
+def test_class_info_to_csv():
+    link_set = make_link_set()
+    class_info_key, all_class_info_val = fetch_class_info(link_set)
+
+    with open('csv/class.csv', 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(class_info_key)
+        writer.writerows(all_class_info_val)
+
+    # print('class_info_key:\n', class_info_key)
+    # print('all_class_info_val:\n', all_class_info_val)
 
     return
 
+def test_class_link_to_csv():
+    link_set = make_link_set()
+    link_list = list(link_set)
+
+    header = ['link']
+    n = len(link_list)
+    for i in range(n):
+        link_list[i] = [link_list[i]]
+
+    with open('csv/link.csv', 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(link_list)
+
 def test():
     # test_extract_key_to_link()
-    test_fetch_class_info()
+    # test_fetch_class_info()
+    # test_class_link_to_csv()
+    test_class_info_to_csv()
 
 if __name__ == '__main__':
     test()

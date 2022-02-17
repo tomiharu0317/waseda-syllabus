@@ -95,10 +95,6 @@ def fetch_pagesource(link: str):
 
     return html
 
-# FIXME
-# 1. シラバス情報は取らないので find_all -> find('table', class_= 'ct-common ct-sirabasu')
-# 2. key の取得は初回だけにするので first_time = FALSE で 最初に TRUE に変換し以降は if で 処理
-# 3. key_list において 授業方法区分 と コースコードの間に 空白の要素があるので取り除く 順番は決まっているのでindexで指定できる
 def extract_key_from_table(tr_list: list):
     class_info_key: list = []
     
@@ -109,6 +105,16 @@ def extract_key_from_table(tr_list: list):
     # 授業方法区分 と コースコードの間に 空白の要素があるので取り除く
     class_info_key.pop(14)
 
+    # オープン科目の情報を追加 len() = 21なら
+    # オープン科目のスペースの空白文字があるので変換
+    if len(class_info_key) == 21:
+        class_info_key[-1] = 'オープン科目'
+    else:
+        class_info_key.append('オープン科目')
+
+    print(class_info_key)
+    print('len(class_info_key)', len(class_info_key))
+
     return class_info_key
 
 def extract_val_from_table(tr_list: list):
@@ -117,6 +123,12 @@ def extract_val_from_table(tr_list: list):
     for tr in tr_list:
         vals = [td.get_text() for td in tr.find_all('td')]
         val_list += vals
+
+    # オープン科目の情報があればTrueになければFalseとして追加
+    if val_list[-1] == 'オープン科目':
+        val_list[-1] = True
+    else:
+        val_list.append(False)
 
     return val_list
 
@@ -133,6 +145,8 @@ def fetch_class_info(link_set: set):
         table = soup.find('table', class_= 'ct-common ct-sirabasu')
         tr_list: list = table.find_all('tr')
 
+        # key の取得は初回だけにするので first_time = FALSE で
+        # 最初に TRUE に変換し以降は if で 処理
         if first_time == False: 
             first_time = True
             class_info_key = extract_key_from_table(tr_list)
@@ -148,6 +162,15 @@ def fetch_class_info(link_set: set):
         all_class_info_val.append(val_list)
 
     return class_info_key, all_class_info_val
+
+def clear_td(val: str):
+    val = val.replace('<td>', '')
+    val = val[::-1]
+    # </td>の逆
+    val = val.replace('>dt/<', '')
+    val = val[::-1]
+
+    return val
 
 def extract_html_from_table(tr_list: list):
     syllabus_info_dict: dict = {
@@ -172,6 +195,8 @@ def extract_html_from_table(tr_list: list):
 
             if key in syllabus_info_dict:
                 val = str(key_val_list[1])
+                #  先頭の<td></td>を削除
+                val = clear_td(val)                
                 syllabus_info_dict[key] = val
         except Exception as e:
             print(e)
@@ -185,9 +210,6 @@ def syllabus_info_key():
         '授業計画', '教科書', '参考文献', '成績評価方法', '備考・関連URL', '元シラバスリンク']
     return syllabus_info_key_list
 
-# table1は従来の処理、table2はtag.contentsでtrを取得し、
-# dict[key]に対する値としてstr(html)の形式で保存
-# 最後にtable1とmergeする
 def fetch_class(link_set: set):
 
     class_info_key: list = []
@@ -235,6 +257,7 @@ def make_link_set():
     link_set: set = set()
     link_set.add('https://www.wsl.waseda.jp/syllabus/JAA104.php?pKey=3332000502012022333200050233&pLng=jp')
     link_set.add('https://www.wsl.waseda.jp/syllabus/JAA104.php?pKey=1200007D810120221200007D8112&pLng=jp')
+    link_set.add('https://www.wsl.waseda.jp/syllabus/JAA104.php?pKey=1200000050012022120000005012&pLng=jp')
     
     return link_set
 
@@ -246,7 +269,6 @@ def test_fetch_class_info():
 def test_class_info_to_csv():
     link_set = make_link_set()
     class_info_key, all_class_info_val = fetch_class(link_set)
-    print(len(all_class_info_val))
 
     with open('../data/class.csv', 'w') as f:
         writer = csv.writer(f)
@@ -255,8 +277,6 @@ def test_class_info_to_csv():
 
     # print('class_info_key:\n', class_info_key)
     # print('all_class_info_val:\n', all_class_info_val)
-
-    return
 
 def test_class_link_to_csv():
     link_set = make_link_set()
@@ -276,12 +296,17 @@ def test_fetch_class():
     link_set = make_link_set()
     fetch_class(link_set)
 
+def test_clear_td():
+    string = '<td>aaa</td>'
+    print(clear_td(string))
+
 def test():
     # test_extract_key_to_link()
     # test_fetch_class_info()
     # test_class_link_to_csv()
     test_class_info_to_csv()
     # test_fetch_class()
+    # test_clear_td()
 
 if __name__ == '__main__':
     test()

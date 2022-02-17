@@ -146,16 +146,23 @@ def fetch_class_info(link_set: set):
 
     return class_info_key, all_class_info_val
 
-def class_info_to_csv(class_info: list):
-    with open('data/class.csv', 'w') as f:
-        writer = csv.writer()
-        writer.writerows(class_info)
+def class_info_to_csv(class_info_key: list, all_class_info_val: list):
+    with open('../data/class.csv', 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(class_info_key)
+        writer.writerows(all_class_info_val)
 
 def class_link_to_csv(link_set: set):
     link_list = list(link_set)
 
-    with open('data/link.csv', 'w') as f:
-        writer = csv.writer()
+    header = ['link']
+    n = len(link_list)
+    for i in range(n):
+        link_list[i] = [link_list[i]]
+
+    with open('../data/all_class_link.csv', 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
         writer.writerows(link_list)
 
 def main():
@@ -206,9 +213,7 @@ def main():
 
     class_info_key, all_class_info_val = fetch_class_info(link_set)
     
-    # FIXME: csvへの保存の仕方
-    # class_info_to_csv(class_info)
-
+    class_info_to_csv(class_info_key, all_class_info_val)
     print('Successfully fetched class info and save to csv!')
 
     driver.quit()

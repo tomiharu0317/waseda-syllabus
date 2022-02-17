@@ -165,7 +165,7 @@ def test_class_info_to_csv():
     link_set = make_link_set()
     class_info_key, all_class_info_val = fetch_class_info(link_set)
 
-    with open('csv/class.csv', 'w') as f:
+    with open('../data/class.csv', 'w') as f:
         writer = csv.writer(f)
         writer.writerow(class_info_key)
         writer.writerows(all_class_info_val)
@@ -184,7 +184,7 @@ def test_class_link_to_csv():
     for i in range(n):
         link_list[i] = [link_list[i]]
 
-    with open('csv/link.csv', 'w') as f:
+    with open('../data/link.csv', 'w') as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(link_list)
@@ -192,7 +192,7 @@ def test_class_link_to_csv():
 def test():
     # test_extract_key_to_link()
     # test_fetch_class_info()
-    # test_class_link_to_csv()
+    test_class_link_to_csv()
     test_class_info_to_csv()
 
 if __name__ == '__main__':

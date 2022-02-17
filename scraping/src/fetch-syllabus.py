@@ -120,8 +120,8 @@ def extract_key_from_table(tr_list: list):
     else:
         class_info_key.append('オープン科目')
 
-    print(class_info_key)
-    print('len(class_info_key)', len(class_info_key))
+    # print(class_info_key)
+    # print('len(class_info_key)', len(class_info_key))
 
     return class_info_key
 
@@ -246,7 +246,8 @@ def main():
     print('Start fetching...')
 
     link_set: set = set()
-    week_list: list = ['月', '火', '水', '木', '金', '土', '日', '無']
+    # week_list: list = ['月', '火', '水', '木', '金', '土', '日', '無']
+    week_list: list = ['日']
     TOP_URL: str = 'https://www.wsl.waseda.jp/syllabus/JAA101.php?pLng=jp'
 
     for week in week_list:

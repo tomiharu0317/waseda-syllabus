@@ -94,6 +94,15 @@ def fetch_pagesource(link: str):
 
     return html
 
+def clear_td(val: str):
+    val = val.replace('<td>', '')
+    val = val[::-1]
+    # </td>の逆
+    val = val.replace('>dt/<', '')
+    val = val[::-1]
+
+    return val
+
 def extract_key_from_table(tr_list: list):
     class_info_key: list = []
     
@@ -104,6 +113,16 @@ def extract_key_from_table(tr_list: list):
     # 授業方法区分 と コースコードの間に 空白の要素があるので取り除く
     class_info_key.pop(14)
 
+    # オープン科目の情報を追加 len() = 21なら
+    # オープン科目のスペースの空白文字があるので変換
+    if len(class_info_key) == 21:
+        class_info_key[-1] = 'オープン科目'
+    else:
+        class_info_key.append('オープン科目')
+
+    print(class_info_key)
+    print('len(class_info_key)', len(class_info_key))
+
     return class_info_key
 
 def extract_val_from_table(tr_list: list):
@@ -113,7 +132,51 @@ def extract_val_from_table(tr_list: list):
         vals = [td.get_text() for td in tr.find_all('td')]
         val_list += vals
 
+    # オープン科目の情報があればTrueになければFalseとして追加
+    if val_list[-1] == 'オープン科目':
+        val_list[-1] = True
+    else:
+        val_list.append(False)
+
     return val_list
+
+def extract_html_from_table(tr_list: list):
+    syllabus_info_dict: dict = {
+        '副題': None,
+        '授業概要': None,
+        '授業の到達目標': None,
+        '事前・事後学習の内容': None,
+        '授業計画': None,
+        '教科書': None,
+        '参考文献': None,
+        '成績評価方法': None,
+        '備考・関連URL': None
+    }
+
+    for tr in tr_list:
+        key_val_list = tr.contents
+        key_val_list = [elem for elem in key_val_list if elem != '\n']
+
+        # syllabus_info_dictのkeyを取得
+        try:
+            key = key_val_list[0].get_text()
+
+            if key in syllabus_info_dict:
+                val = str(key_val_list[1])
+                #  先頭の<td></td>を削除
+                val = clear_td(val)                
+                syllabus_info_dict[key] = val
+        except Exception as e:
+            print(e)
+            continue
+
+    return list(syllabus_info_dict.values())
+
+def syllabus_info_key():
+    syllabus_info_key_list: list = [
+        '副題', '授業概要', '授業の到達目標', '事前・事後学習の内容',
+        '授業計画', '教科書', '参考文献', '成績評価方法', '備考・関連URL', '元シラバスリンク']
+    return syllabus_info_key_list
 
 def fetch_class_info(link_set: set):
 
@@ -122,26 +185,38 @@ def fetch_class_info(link_set: set):
     first_time: bool = False
 
     for link in link_set:
-
         html = fetch_pagesource(link)
         soup = BeautifulSoup(html, 'html.parser')
-        # シラバス情報の取得は断念
-        table = soup.find('table', class_= 'ct-common ct-sirabasu')
-        tr_list: list = table.find_all('tr')
-
-        # 初回のみkeyを取得
-        if first_time == False: 
-            first_time = True
-            class_info_key = extract_key_from_table(tr_list)
-            class_info_key.append('元シラバスリンク')
-            print('class_info_key:\n', class_info_key)
-            print('len(class_info_key):', len(class_info_key))
+        # 改行コードを削除
+        [tag.extract() for tag in soup(string='n')]
         
-        val_list = extract_val_from_table(tr_list)
-        val_list.append(link)
-        print('val_list:\n', val_list)
-        print('len(val_list):', len(val_list))
-    
+        table_list: list = soup.find_all('table', class_= 'ct-common ct-sirabasu')
+        val_list: list = []
+
+        # table1:授業情報 table2:シラバス情報
+        for id in range(2):
+            table = table_list[id]
+            if id == 0:
+                tr_list: list = table.find_all('tr')
+                if first_time == False: 
+                    first_time = True
+                    class_info_key = extract_key_from_table(tr_list) + syllabus_info_key()
+
+                val_list = extract_val_from_table(tr_list)
+            # シラバス情報のtableは自由度が高く、単純に文章を取得できないので
+            # 子要素のtdタグを取得し、html -> markdownにすることで対処する
+            else:
+                tbody = table_list[id].contents
+                # 改行コードが入っているので削除
+                tbody = [tbody for tbody in tbody if tbody != '\n'][0]
+
+                # 1つ階層が下の'tr'タグを取得
+                tr_list: list = tbody.contents
+                tr_list = [tr for tr in tr_list if tr != '\n']
+                # table1の情報と結合
+                val_list += extract_html_from_table(tr_list)
+                val_list.append(link)
+
         all_class_info_val.append(val_list)
 
     return class_info_key, all_class_info_val

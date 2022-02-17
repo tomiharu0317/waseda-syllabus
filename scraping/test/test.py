@@ -2,7 +2,6 @@ from cgi import test
 import os
 import csv
 from pickle import FALSE, TRUE
-import pytest
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.support.select import Select

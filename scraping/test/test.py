@@ -163,11 +163,21 @@ def extract_html_from_table(tr_list: list):
     }
 
     for tr in tr_list:
-        key = tr.find('th').get_text()  # syllabus_info_dictのkeyを取得
-        val = str(tr.find('td'))
-        syllabus_info_dict[key] = val
+        key_val_list = tr.contents
+        key_val_list = [elem for elem in key_val_list if elem != '\n']
 
-    return syllabus_info_dict.values()
+        # syllabus_info_dictのkeyを取得
+        try:
+            key = key_val_list[0].get_text()
+
+            if key in syllabus_info_dict:
+                val = str(key_val_list[1])
+                syllabus_info_dict[key] = val
+        except Exception as e:
+            print(e)
+            continue
+
+    return list(syllabus_info_dict.values())
 
 def syllabus_info_key():
     syllabus_info_key_list: list = [
@@ -187,33 +197,35 @@ def fetch_class(link_set: set):
     for link in link_set:
         html = fetch_pagesource(link)
         soup = BeautifulSoup(html, 'html.parser')
+        # 改行コードを削除
+        [tag.extract() for tag in soup(string='n')]
+        
         table_list: list = soup.find_all('table', class_= 'ct-common ct-sirabasu')
         val_list: list = []
 
         # table1:授業情報 table2:シラバス情報
         for id in range(2):
-            tbody = table_list[id].contents
-            # 1つ階層が下の'tr'タグを取得
-            tr_list: list = tbody.contents
-            # 改行コードが入っているので削除
-            tr_list = [tr for tr in tr_list if tr != '\n']
-
+            table = table_list[id]
             if id == 0:
+                tr_list: list = table.find_all('tr')
                 if first_time == False: 
                     first_time = True
                     class_info_key = extract_key_from_table(tr_list) + syllabus_info_key()
-                    # print('class_info_key:\n', class_info_key)
-                    # print('len(class_info_key):', len(class_info_key))
+
                 val_list = extract_val_from_table(tr_list)
             # シラバス情報のtableは自由度が高く、単純に文章を取得できないので
             # 子要素のtdタグを取得し、html -> markdownにすることで対処する
             else:
+                tbody = table_list[id].contents
+                # 改行コードが入っているので削除
+                tbody = [tbody for tbody in tbody if tbody != '\n'][0]
+
+                # 1つ階層が下の'tr'タグを取得
+                tr_list: list = tbody.contents
+                tr_list = [tr for tr in tr_list if tr != '\n']
                 # table1の情報と結合
                 val_list += extract_html_from_table(tr_list)
                 val_list.append(link)
-
-        # print('val_list:\n', val_list)
-        print('len(val_list):', len(val_list))
 
         all_class_info_val.append(val_list)
 
@@ -233,7 +245,8 @@ def test_fetch_class_info():
 
 def test_class_info_to_csv():
     link_set = make_link_set()
-    class_info_key, all_class_info_val = fetch_class_info(link_set)
+    class_info_key, all_class_info_val = fetch_class(link_set)
+    print(len(all_class_info_val))
 
     with open('../data/class.csv', 'w') as f:
         writer = csv.writer(f)
@@ -267,8 +280,8 @@ def test():
     # test_extract_key_to_link()
     # test_fetch_class_info()
     # test_class_link_to_csv()
-    # test_class_info_to_csv()
-    test_fetch_class()
+    test_class_info_to_csv()
+    # test_fetch_class()
 
 if __name__ == '__main__':
     test()

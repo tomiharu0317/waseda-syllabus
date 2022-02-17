@@ -149,6 +149,76 @@ def fetch_class_info(link_set: set):
 
     return class_info_key, all_class_info_val
 
+def extract_html_from_table(tr_list: list):
+    syllabus_info_dict: dict = {
+        '副題': None,
+        '授業概要': None,
+        '授業の到達目標': None,
+        '事前・事後学習の内容': None,
+        '授業計画': None,
+        '教科書': None,
+        '参考文献': None,
+        '成績評価方法': None,
+        '備考・関連URL': None
+    }
+
+    for tr in tr_list:
+        key = tr.find('th').get_text()  # syllabus_info_dictのkeyを取得
+        val = str(tr.find('td'))
+        syllabus_info_dict[key] = val
+
+    return syllabus_info_dict.values()
+
+def syllabus_info_key():
+    syllabus_info_key_list: list = [
+        '副題', '授業概要', '授業の到達目標', '事前・事後学習の内容',
+        '授業計画', '教科書', '参考文献', '成績評価方法', '備考・関連URL', '元シラバスリンク']
+    return syllabus_info_key_list
+
+# table1は従来の処理、table2はtag.contentsでtrを取得し、
+# dict[key]に対する値としてstr(html)の形式で保存
+# 最後にtable1とmergeする
+def fetch_class(link_set: set):
+
+    class_info_key: list = []
+    all_class_info_val: list = []
+    first_time: bool = False
+
+    for link in link_set:
+        html = fetch_pagesource(link)
+        soup = BeautifulSoup(html, 'html.parser')
+        table_list: list = soup.find_all('table', class_= 'ct-common ct-sirabasu')
+        val_list: list = []
+
+        # table1:授業情報 table2:シラバス情報
+        for id in range(2):
+            tbody = table_list[id].contents
+            # 1つ階層が下の'tr'タグを取得
+            tr_list: list = tbody.contents
+            # 改行コードが入っているので削除
+            tr_list = [tr for tr in tr_list if tr != '\n']
+
+            if id == 0:
+                if first_time == False: 
+                    first_time = True
+                    class_info_key = extract_key_from_table(tr_list) + syllabus_info_key()
+                    # print('class_info_key:\n', class_info_key)
+                    # print('len(class_info_key):', len(class_info_key))
+                val_list = extract_val_from_table(tr_list)
+            # シラバス情報のtableは自由度が高く、単純に文章を取得できないので
+            # 子要素のtdタグを取得し、html -> markdownにすることで対処する
+            else:
+                # table1の情報と結合
+                val_list += extract_html_from_table(tr_list)
+                val_list.append(link)
+
+        # print('val_list:\n', val_list)
+        print('len(val_list):', len(val_list))
+
+        all_class_info_val.append(val_list)
+
+    return class_info_key, all_class_info_val
+
 def make_link_set():
     link_set: set = set()
     link_set.add('https://www.wsl.waseda.jp/syllabus/JAA104.php?pKey=3332000502012022333200050233&pLng=jp')
@@ -189,11 +259,16 @@ def test_class_link_to_csv():
         writer.writerow(header)
         writer.writerows(link_list)
 
+def test_fetch_class():
+    link_set = make_link_set()
+    fetch_class(link_set)
+
 def test():
     # test_extract_key_to_link()
     # test_fetch_class_info()
-    test_class_link_to_csv()
-    test_class_info_to_csv()
+    # test_class_link_to_csv()
+    # test_class_info_to_csv()
+    test_fetch_class()
 
 if __name__ == '__main__':
     test()

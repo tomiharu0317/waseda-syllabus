@@ -14,8 +14,10 @@ from lib2to3.pgen2 import driver
 import os
 import csv
 import time
+import pandas as pd
 from pickle import FALSE, TRUE
 from bs4 import BeautifulSoup
+from numpy import number
 from selenium import webdriver
 from selenium.webdriver.support.select import Select
 
@@ -84,6 +86,30 @@ def add_to_link_set(link_set: set):
     # print('link_set:\n', link_set)
 
     return link_set
+
+# FIXME その曜日の最後のページ番号を取得
+def fetch_last_page_num():
+    driver.implicitly_wait(3)
+
+    html = driver.page_source.encode('utf-8')
+    soup = BeautifulSoup(html, 'html.parser')
+    btn_table = soup.find('div', class_ = 'l-btn-c')
+    a_list = btn_table.find_all('a')
+    last_page_num: int = 1
+
+    for a in a_list:
+        text = a.get_text()
+        try:
+            last_page_num = int(text)
+        except ValueError as e:
+            print(e)
+            print(text)
+            pass
+
+    print('last_page_num', last_page_num)
+    driver.quit()
+
+    return last_page_num
 # --------------------------------------------------------
 # リンクに飛んで詳細ページの情報を取得する関数 ------------------
 def fetch_pagesource(link: str):
@@ -178,13 +204,18 @@ def syllabus_info_key():
         '授業計画', '教科書', '参考文献', '成績評価方法', '備考・関連URL', '元シラバスリンク']
     return syllabus_info_key_list
 
-def fetch_class_info(link_set: set):
+# FIXME: 12000件ずつ取るので、listにして一意にする
+def fetch_class_info(link_list: list):
 
     class_info_key: list = []
     all_class_info_val: list = []
     first_time: bool = False
+    count: int = 0
 
-    for link in link_set:
+    for link in link_list:
+        count += 1
+        print('class num: ', count)
+
         html = fetch_pagesource(link)
         soup = BeautifulSoup(html, 'html.parser')
         # 改行コードを削除
@@ -221,33 +252,49 @@ def fetch_class_info(link_set: set):
 
     return class_info_key, all_class_info_val
 
-def class_info_to_csv(class_info_key: list, all_class_info_val: list):
-    with open('../data/class.csv', 'w') as f:
+def class_info_to_csv(class_info_key: list, all_class_info_val: list, group: int):
+    filename = '../data/class_'+ str(group) + '.csv'
+    
+    with open(filename, 'w') as f:
         writer = csv.writer(f)
         writer.writerow(class_info_key)
         writer.writerows(all_class_info_val)
 
-def class_link_to_csv(link_set: set):
-    link_list = list(link_set)
-
+def class_link_to_csv(link_list: list, group: int):
     header = ['link']
+    filename = '../data/all_class_link_' + str(group) +'.csv'
     n = len(link_list)
     for i in range(n):
         link_list[i] = [link_list[i]]
 
-    with open('../data/all_class_link.csv', 'w') as f:
+    with open(filename, 'w') as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(link_list)
+
+def link_set_from_csv():
+    # 既存のリンクを取得し、1次元セットに変換
+    link_df = pd.read_csv('../data/all_class_link.csv')
+    link_list: list = link_df.values.tolist()
+    # 1次元に変換
+    link_list = [link[0] for link in link_list]
+    link_set = set(link_list)
+
+    return link_set
 
 def main():
     # 全授業の詳細ページへのリンクを取得 ---------------------------
     # --------------------------------------------------------
     print('Start fetching...')
 
-    link_set: set = set()
+    # link_set: set = set()
+
+    # FIXME csvからdataframeを取得してsetに変換する
+    link_set = link_set_from_csv()
+
     # week_list: list = ['月', '火', '水', '木', '金', '土', '日', '無']
-    week_list: list = ['日']
+    week_list: list = ['無']
+    summary:list = []
     TOP_URL: str = 'https://www.wsl.waseda.jp/syllabus/JAA101.php?pLng=jp'
 
     for week in week_list:
@@ -261,6 +308,13 @@ def main():
 
         print('week:' + week + ' now fetching...')
         pagecount = 0
+        last_page_num = 1
+
+        # 1ページしかない曜日の場合エラーが出るのでパス
+        try: 
+            last_page_num = fetch_last_page_num()
+        except Exception as e:
+            pass
 
         # ページに表示されている10件のリンクを追加
         while True: 
@@ -279,20 +333,57 @@ def main():
                 print('Successfully went to next page...')
             except Exception as e:
                 print(e)
-                print('Finish fetching class info of week: ' + week)
-                break
+                # 最後にページで次へボタンがないなら正常に終了
+                if pagecount == last_page_num:
+                    print('Finish fetching class info of week: ' + week)
+                    summary.append(week + ':' + str(pagecount) + 'ページ')
+                    break
+                # 何らかのバグで最後のページではないのに次へボタンが
+                # ない場合、次に飛びたいページ番号をクリックして直接飛ぶ
+                # 202ページに次へボタンがない -> 201ページへ戻って203ページへ飛ぶ
+                else:
+                    # FIXME バグの時戻って行きたいページのボタンをクリック--------------------------------------------------
+                    # 次に目指すページ
+                    pagecount += 1
+                    driver.back()
+                    # ボタンtableで目指すページのボタンをクリック
+                    driver.find_element_by_xpath("//div[@class='l-btn-c']").find_element_by_xpath("//p[text()=" + str(pagecount) + "]").click()
+                    # ループの最初に+=1されるので、辻褄を合わせる
+                    pagecount -= 1
+                    # --------------------------------------------------------
 
     # --------------------------------------------------------
     # リンク一覧に飛んで詳細情報を取得 ----------------------------
+    print(summary)
     print('Finish fetching all links and start fetching details...')
-    class_link_to_csv(link_set)
 
-    class_info_key, all_class_info_val = fetch_class_info(link_set)
-    
-    class_info_to_csv(class_info_key, all_class_info_val)
-    print('Successfully fetched class info and save to csv!')
+    link_list: list = list(link_set)
+    num_of_links: int = len(link_set)
+    link_list_by_group: list = []
+
+    for i in range(num_of_links):
+        link_list_by_group.append(link_list[i])
+
+        # TimeoutError に対応するため 12000件(正確には12001)ずつとる
+        if i != 0 and i % 12000 == 0:
+            group = int(i / 12000)
+            class_link_to_csv(link_list_by_group, group)
+            class_info_key, all_class_info_val = fetch_class_info(link_list_by_group)
+            class_info_to_csv(class_info_key, all_class_info_val, group)
+            print('Successfully fetched class info and save to csv!')
+
+            # 初期化
+            link_list_by_group = []
+
+    # 実行結果を確認
+    for result in summary:
+        print(result)
 
     driver.quit()
 
 if __name__ == '__main__':
     main()
+
+# やること
+# - 既存のlink_setをcsvから取得し、無の日のlinkを一通りset.add()する
+# - setから12000件ごと詳細を取得し、link_groupnum.csvとclass_groupnum.csvに保存

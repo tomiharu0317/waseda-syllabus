@@ -1,6 +1,7 @@
 from cgi import test
 import os
 import csv
+import pandas as pd
 from pickle import FALSE, TRUE
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -299,13 +300,54 @@ def test_clear_td():
     string = '<td>aaa</td>'
     print(clear_td(string))
 
+def test_link_set_from_csv():
+    link_df = pd.read_csv('../data/all_class_link.csv')
+    link_list: list = link_df.values.tolist()
+    # 1次元に変換
+    link_list = [link[0] for link in link_list]
+    link_set = set(link_list)
+
+    return link_set
+
+def test_fetch_last_page_num():
+
+    start()
+    driver.implicitly_wait(3)
+
+    html = driver.page_source.encode('utf-8')
+    soup = BeautifulSoup(html, 'html.parser')
+    btn_table = soup.find('div', class_ = 'l-btn-c')
+    a_list = btn_table.find_all('a')
+    last_page_num: int = 1
+
+    for a in a_list:
+        text = a.get_text()
+        try:
+            last_page_num = int(text)
+        except ValueError as e:
+            print(e)
+            print(text)
+            pass
+
+    print('last_page_num', last_page_num)
+    driver.quit()
+
+    return last_page_num
+
 def test():
     # test_extract_key_to_link()
     # test_fetch_class_info()
     # test_class_link_to_csv()
-    test_class_info_to_csv()
+    # test_class_info_to_csv()
     # test_fetch_class()
     # test_clear_td()
+    test_link_set_from_csv()
+    # test_fetch_last_page_num()
 
 if __name__ == '__main__':
     test()
+
+# テストすること
+# 1. その曜日の最後のページ番号の取得
+# 2. 次のページボタンをクリック
+# 3. csvからlinkを取得しsetにする

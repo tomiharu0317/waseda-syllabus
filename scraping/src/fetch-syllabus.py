@@ -194,6 +194,7 @@ def extract_html_from_table(tr_list: list):
                 syllabus_info_dict[key] = val
         except Exception as e:
             print(e)
+            print(key_val_list)
             continue
 
     return list(syllabus_info_dict.values())
@@ -204,7 +205,6 @@ def syllabus_info_key():
         '授業計画', '教科書', '参考文献', '成績評価方法', '備考・関連URL', '元シラバスリンク']
     return syllabus_info_key_list
 
-# FIXME: 12000件ずつ取るので、listにして一意にする
 def fetch_class_info(link_list: list):
 
     class_info_key: list = []
@@ -216,7 +216,7 @@ def fetch_class_info(link_list: list):
         count += 1
         print('class num: ', count)
 
-        html = fetch_pagesource(link)
+        html = fetch_pagesource(link[0])
         soup = BeautifulSoup(html, 'html.parser')
         # 改行コードを削除
         [tag.extract() for tag in soup(string='n')]
@@ -291,71 +291,70 @@ def main():
 
     # FIXME csvからdataframeを取得してsetに変換する
     link_set = link_set_from_csv()
-
     # week_list: list = ['月', '火', '水', '木', '金', '土', '日', '無']
-    week_list: list = ['無']
-    summary:list = []
-    TOP_URL: str = 'https://www.wsl.waseda.jp/syllabus/JAA101.php?pLng=jp'
+    # week_list: list = ['無']
+    # summary:list = []
+    # TOP_URL: str = 'https://www.wsl.waseda.jp/syllabus/JAA101.php?pLng=jp'
 
-    for week in week_list:
-        driver.get(TOP_URL)
+    # for week in week_list:
+    #     driver.get(TOP_URL)
 
-        # 曜日を条件として選択して授業を検索
-        youbi = driver.find_element_by_name('p_youbi')
-        select_youbi = Select(youbi)
-        select_youbi.select_by_visible_text(week)
-        driver.find_element_by_xpath("//input[@value=' 検  索 ']").click()
+    #     # 曜日を条件として選択して授業を検索
+    #     youbi = driver.find_element_by_name('p_youbi')
+    #     select_youbi = Select(youbi)
+    #     select_youbi.select_by_visible_text(week)
+    #     driver.find_element_by_xpath("//input[@value=' 検  索 ']").click()
 
-        print('week:' + week + ' now fetching...')
-        pagecount = 0
-        last_page_num = 1
+    #     print('week:' + week + ' now fetching...')
+    #     pagecount = 0
+    #     last_page_num = 1
 
-        # 1ページしかない曜日の場合エラーが出るのでパス
-        try: 
-            last_page_num = fetch_last_page_num()
-        except Exception as e:
-            pass
+    #     # 1ページしかない曜日の場合エラーが出るのでパス
+    #     try: 
+    #         last_page_num = fetch_last_page_num()
+    #     except Exception as e:
+    #         pass
 
-        # ページに表示されている10件のリンクを追加
-        while True: 
-            pagecount += 1
-            print('\n')
-            print('現在のページ数: ', pagecount)
+    #     # ページに表示されている10件のリンクを追加
+    #     while True: 
+    #         pagecount += 1
+    #         print('\n')
+    #         print('現在のページ数: ', pagecount)
 
-            link_set = add_to_link_set(link_set)
+    #         link_set = add_to_link_set(link_set)
 
-            # 表示されているページの詳細リンクを作成したらページ遷移
-            # 次へがなかったら最後のページまで行っているので、
-            # continueして次の曜日へ
-            try: 
-                driver.find_element_by_xpath("//table[@class='t-btn']").find_element_by_xpath("//*[text()=\"次へ>\"]").click()
-                time.sleep(1)
-                print('Successfully went to next page...')
-            except Exception as e:
-                print(e)
-                # 最後にページで次へボタンがないなら正常に終了
-                if pagecount == last_page_num:
-                    print('Finish fetching class info of week: ' + week)
-                    summary.append(week + ':' + str(pagecount) + 'ページ')
-                    break
-                # 何らかのバグで最後のページではないのに次へボタンが
-                # ない場合、次に飛びたいページ番号をクリックして直接飛ぶ
-                # 202ページに次へボタンがない -> 201ページへ戻って203ページへ飛ぶ
-                else:
-                    # FIXME バグの時戻って行きたいページのボタンをクリック--------------------------------------------------
-                    # 次に目指すページ
-                    pagecount += 1
-                    driver.back()
-                    # ボタンtableで目指すページのボタンをクリック
-                    driver.find_element_by_xpath("//div[@class='l-btn-c']").find_element_by_xpath("//p[text()=" + str(pagecount) + "]").click()
-                    # ループの最初に+=1されるので、辻褄を合わせる
-                    pagecount -= 1
-                    # --------------------------------------------------------
+    #         # 表示されているページの詳細リンクを作成したらページ遷移
+    #         # 次へがなかったら最後のページまで行っているので、
+    #         # continueして次の曜日へ
+    #         try: 
+    #             driver.find_element_by_xpath("//table[@class='t-btn']").find_element_by_xpath("//*[text()=\"次へ>\"]").click()
+    #             time.sleep(1)
+    #             print('Successfully went to next page...')
+    #         except Exception as e:
+    #             print(e)
+    #             # 最後にページで次へボタンがないなら正常に終了
+    #             if pagecount == last_page_num:
+    #                 print('Finish fetching class info of week: ' + week)
+    #                 summary.append(week + ':' + str(pagecount) + 'ページ')
+    #                 break
+    #             # 何らかのバグで最後のページではないのに次へボタンが
+    #             # ない場合、次に飛びたいページ番号をクリックして直接飛ぶ
+    #             # 202ページに次へボタンがない -> 201ページへ戻って203ページへ飛ぶ
+    #             else:
+    #                 # FIXME バグの時戻って行きたいページのボタンをクリック--------------------------------------------------
+    #                 # 次に目指すページ
+    #                 pagecount += 1
+    #                 driver.back()
+    #                 # ボタンtableで目指すページのボタンをクリック
+    #                 driver.find_element_by_xpath("//div[@class='l-btn-c']").find_element_by_xpath("//p[text()=" + str(pagecount) + "]").click()
+    #                 # ループの最初に+=1されるので、辻褄を合わせる
+    #                 pagecount -= 1
+    #                 # --------------------------------------------------------
 
-    # --------------------------------------------------------
-    # リンク一覧に飛んで詳細情報を取得 ----------------------------
-    print(summary)
-    print('Finish fetching all links and start fetching details...')
+    # # --------------------------------------------------------
+    # # リンク一覧に飛んで詳細情報を取得 ----------------------------
+    # print(summary)
+    # print('Finish fetching all links and start fetching details...')
 
     link_list: list = list(link_set)
     num_of_links: int = len(link_set)
@@ -375,9 +374,9 @@ def main():
             # 初期化
             link_list_by_group = []
 
-    # 実行結果を確認
-    for result in summary:
-        print(result)
+    # # 実行結果を確認
+    # for result in summary:
+    #     print(result)
 
     driver.quit()
 
